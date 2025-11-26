@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backblaze B2 Pre-Signed URLs</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔗 Backblaze B2 Pre-Signed URLs</h1>
+            <p class="subtitle">Generate and test pre-signed URLs for upload and download</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-button active" data-tab="download">Download URL</button>
+            <button class="tab-button" data-tab="upload">Upload URL</button>
+            <button class="tab-button" data-tab="list">List Files</button>
+        </div>
+
+        <!-- Download Tab -->
+        <div class="tab-content active" id="download-tab">
+            <div class="card">
+                <h2>Generate Download Pre-Signed URL</h2>
+                <form id="download-form">
+                    <div class="form-group">
+                        <label for="download-file-name">File Name:</label>
+                        <input type="text" id="download-file-name" placeholder="e.g., image.png" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="download-expiration">Expiration (seconds):</label>
+                        <input type="number" id="download-expiration" value="3600" min="1" max="604800">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Generate Download URL</button>
+                </form>
+                <div id="download-result" class="result"></div>
+            </div>
+        </div>
+
+        <!-- Upload Tab -->
+        <div class="tab-content" id="upload-tab">
+            <div class="card">
+                <h2>Generate Upload Pre-Signed URL</h2>
+                <form id="upload-form">
+                    <div class="form-group">
+                        <label for="upload-file-name">File Name:</label>
+                        <input type="text" id="upload-file-name" placeholder="e.g., myfile.pdf" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="upload-expiration">Expiration (seconds):</label>
+                        <input type="number" id="upload-expiration" value="3600" min="1" max="604800">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Generate Upload URL</button>
+                </form>
+                <div id="upload-result" class="result"></div>
+            </div>
+            <div class="card" id="upload-test-section" style="display: none;">
+                <h2>Test Upload</h2>
+                <form id="upload-test-form">
+                    <div class="form-group">
+                        <label for="file-input">Select File to Upload:</label>
+                        <input type="file" id="file-input">
+                    </div>
+                    <button type="submit" class="btn btn-success">Upload File</button>
+                </form>
+                <div id="upload-test-result" class="result"></div>
+            </div>
+        </div>
+
+        <!-- List Files Tab -->
+        <div class="tab-content" id="list-tab">
+            <div class="card">
+                <h2>Files in Bucket</h2>
+                <button id="refresh-files" class="btn btn-secondary">Refresh</button>
+                <div id="files-list" class="files-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+
