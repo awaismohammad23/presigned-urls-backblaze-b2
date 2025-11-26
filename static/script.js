@@ -127,7 +127,7 @@ document.getElementById('upload-test-form').addEventListener('submit', async (e)
         return;
     }
     
-    if (!window.uploadUrl) {
+    if (!window.uploadUrl || !window.uploadFileName) {
         resultDiv.className = 'result error';
         resultDiv.innerHTML = '<strong>Error:</strong> Please generate an upload URL first';
         resultDiv.style.display = 'block';
@@ -138,18 +138,22 @@ document.getElementById('upload-test-form').addEventListener('submit', async (e)
     resultDiv.innerHTML = '<div class="loading">Uploading file...</div>';
     resultDiv.style.display = 'block';
     
+    const file = fileInput.files[0];
+    
+    // Try direct upload first, fall back to server proxy if CORS fails
     try {
-        const file = fileInput.files[0];
+        const contentType = file.type || 'application/octet-stream';
         
         const response = await fetch(window.uploadUrl, {
             method: 'PUT',
             body: file,
             headers: {
-                'Content-Type': file.type
-            }
+                'Content-Type': contentType
+            },
+            mode: 'cors'
         });
         
-        if (response.ok) {
+        if (response.ok || response.status === 200) {
             resultDiv.className = 'result success';
             resultDiv.innerHTML = `
                 <strong>File Uploaded Successfully!</strong>
@@ -162,12 +166,64 @@ document.getElementById('upload-test-form').addEventListener('submit', async (e)
             if (document.getElementById('list-tab').classList.contains('active')) {
                 loadFiles();
             }
+            return;
         } else {
-            throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+            // If direct upload fails, try server proxy
+            throw new Error('Direct upload failed, trying server proxy...');
         }
     } catch (error) {
-        resultDiv.className = 'result error';
-        resultDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+        // Fall back to server-side upload to avoid CORS issues
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.message.includes('Direct upload failed')) {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('file_name', window.uploadFileName);
+                
+                const response = await fetch(`${API_BASE}/upload-file`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <strong>File Uploaded Successfully!</strong>
+                        <p><strong>File:</strong> ${data.file_name}</p>
+                        <p>Uploaded via server proxy (avoids CORS issues)</p>
+                    `;
+                    
+                    fileInput.value = '';
+                    
+                    if (document.getElementById('list-tab').classList.contains('active')) {
+                        loadFiles();
+                    }
+                } else {
+                    throw new Error(data.error || 'Upload failed');
+                }
+            } catch (proxyError) {
+                let errorMessage = proxyError.message;
+                
+                if (proxyError.message.includes('Failed to fetch')) {
+                    errorMessage = 'Failed to upload file. This could be due to:<br><br>' +
+                                  '<strong>1. CORS Configuration:</strong><br>' +
+                                  'For direct browser uploads, configure CORS rules in your B2 bucket settings.<br>' +
+                                  'Go to B2 Dashboard → Bucket Settings → CORS Rules<br><br>' +
+                                  '<strong>2. Server Connection:</strong><br>' +
+                                  'Check that the Flask server is running and accessible.<br><br>' +
+                                  '<strong>3. Network Issues:</strong><br>' +
+                                  'Check your internet connection.<br><br>' +
+                                  'Check browser console (F12) for detailed errors.';
+                }
+                
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<strong>Error:</strong><br>${errorMessage}`;
+            }
+        } else {
+            resultDiv.className = 'result error';
+            resultDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+        }
     }
 });
 

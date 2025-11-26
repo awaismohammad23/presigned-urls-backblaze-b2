@@ -23,7 +23,8 @@ for key, value in os.environ.items():
 print("="*60 + "\n")
 
 app = Flask(__name__, static_folder='static', static_url_path='')
-CORS(app)
+# Enable CORS for all routes and allow credentials
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 # Initialize B2 S3 client
 session = boto3.session.Session()
@@ -143,10 +144,16 @@ def generate_presigned_download_url(bucket_name, file_name, expiration=3600):
 
 def generate_presigned_upload_url(bucket_name, file_name, expiration=3600):
     try:
+        # Generate pre-signed URL for PUT operation
+        # Backblaze B2 requires specific parameters
         url = s3_client.generate_presigned_url(
             'put_object',
-            Params={'Bucket': bucket_name, 'Key': file_name},
-            ExpiresIn=expiration
+            Params={
+                'Bucket': bucket_name,
+                'Key': file_name
+            },
+            ExpiresIn=expiration,
+            HttpMethod='PUT'
         )
         return url
     except Exception as e:
@@ -276,7 +283,7 @@ def check_config():
         
         # Check if it's a permissions error
         if 'UnauthorizedAccess' in error_msg or 'not authorized' in error_msg.lower():
-            config_status['fix_required'] = 'The Application Key needs permission to access this bucket. See FIX_PERMISSIONS.md for instructions.'
+            config_status['fix_required'] = 'The Application Key needs permission to access this bucket. See README.md troubleshooting section.'
             config_status['key_verification'] = {
                 'expected_key_id': '0050428f1a906270000000001',
                 'actual_key_id_preview': aws_access_key_id[:10] + '...' + aws_access_key_id[-5:] if aws_access_key_id and len(aws_access_key_id) > 15 else 'N/A',
@@ -284,6 +291,58 @@ def check_config():
             }
     
     return jsonify(config_status)
+
+
+@app.route('/api/test-upload-url', methods=['POST'])
+def test_upload_url():
+    """Test if an upload URL is valid by checking its format"""
+    try:
+        data = request.get_json()
+        url = data.get('url')
+        
+        if not url:
+            return jsonify({'error': 'URL is required'}), 400
+        
+        # Basic validation - check if URL looks like a valid pre-signed URL
+        is_valid = url.startswith('http') and ('X-Amz' in url or 'AWSAccessKeyId' in url)
+        
+        return jsonify({
+            'success': True,
+            'url_valid': is_valid,
+            'note': 'For direct browser uploads, CORS must be configured on your Backblaze B2 bucket. See README.md for details.'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/upload-file', methods=['POST'])
+def upload_file():
+    """Proxy upload through server to avoid CORS issues"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        file_name = request.form.get('file_name', file.filename)
+        
+        if not file_name:
+            return jsonify({'error': 'file_name is required'}), 400
+        
+        # Upload directly to B2 using the S3 client
+        s3_client.upload_fileobj(
+            file,
+            BUCKET_NAME,
+            file_name,
+            ExtraArgs={'ContentType': file.content_type or 'application/octet-stream'}
+        )
+        
+        return jsonify({
+            'success': True,
+            'file_name': file_name,
+            'message': 'File uploaded successfully'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
