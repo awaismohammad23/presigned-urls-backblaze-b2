@@ -4,11 +4,11 @@ A full-stack web application for generating and testing pre-signed URLs with Bac
 
 ## Features
 
-- 🔗 Generate pre-signed URLs for downloading files
-- ⬆️ Generate pre-signed URLs for uploading files
-- 📁 List all files in your B2 bucket
-- 🧪 Test upload functionality directly from the UI
-- ⏱️ Customizable expiration times for URLs
+- Generate pre-signed URLs for downloading files
+- Generate pre-signed URLs for uploading files
+- List all files in your B2 bucket
+- Test upload functionality directly from the UI
+- Customizable expiration times for URLs
 
 ## Setup
 
