@@ -38,13 +38,21 @@ B2_ENDPOINT_URL=https://s3.us-west-000.backblazeb2.com
 B2_BUCKET_NAME=your_bucket_name
 ```
 
-**Note:** 
+**Important Notes:** 
 - Replace `us-west-000` with your actual B2 region
 - You can find your endpoint URL in your Backblaze B2 dashboard
 - The endpoint format is: `https://s3.<region>.backblazeb2.com`
 - You can write the endpoint URL with or without `https://` - it will be added automatically if missing
   - Example: `B2_ENDPOINT_URL=s3.us-east-005.backblazeb2.com` (works)
   - Example: `B2_ENDPOINT_URL=https://s3.us-east-005.backblazeb2.com` (also works)
+
+**Application Key Permissions:**
+Your Application Key must have the following capabilities:
+- `readFiles` - Required for generating download URLs
+- `writeFiles` - Required for generating upload URLs  
+- `listFiles` - Required for listing files in the bucket
+
+The Application Key must also have access to your bucket (either the specific bucket name or "All Buckets"). If you get "UnauthorizedAccess" errors, see `FIX_PERMISSIONS.md` for detailed instructions.
 
 ### 3. Run the Application
 

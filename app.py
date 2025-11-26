@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import boto3
+from botocore.config import Config
 import os
 from dotenv import load_dotenv
 from datetime import datetime
@@ -41,6 +42,18 @@ endpoint_url = get_env('B2_ENDPOINT_URL', '')
 if endpoint_url and not endpoint_url.startswith(('http://', 'https://')):
     endpoint_url = f'https://{endpoint_url}'
 
+# Extract region from endpoint URL for boto3
+# Format: s3.us-east-005.backblazeb2.com -> us-east-005
+region_name = 'us-east-005'  # default
+if 'us-east-005' in endpoint_url:
+    region_name = 'us-east-005'
+elif 'us-west-' in endpoint_url:
+    # Extract region from URL like s3.us-west-000.backblazeb2.com
+    parts = endpoint_url.split('.')
+    if len(parts) >= 2:
+        region_part = parts[1]  # us-west-000
+        region_name = region_part
+
 # Get credentials - try a few different variable name formats
 aws_access_key_id = get_env('B2_APPLICATION_KEY_ID') or get_env('B2_KEY_ID') or get_env('B2_ACCESS_KEY_ID')
 aws_secret_access_key = get_env('B2_APPLICATION_KEY') or get_env('B2_SECRET_KEY') or get_env('B2_APPLICATION_SECRET')
@@ -80,7 +93,12 @@ if aws_secret_access_key and len(aws_secret_access_key) < 20:
 
 # Print what we loaded (keys are masked)
 if aws_access_key_id:
-    print(f"Loaded B2_APPLICATION_KEY_ID: {aws_access_key_id[:10]}... (length: {len(aws_access_key_id)})")
+    print(f"Loaded B2_APPLICATION_KEY_ID: {aws_access_key_id[:10]}...{aws_access_key_id[-5:]} (length: {len(aws_access_key_id)})")
+    print(f"  Expected keyID: 0050428f1a906270000000001")
+    if aws_access_key_id == '0050428f1a906270000000001':
+        print("  KeyID matches! Using correct key.")
+    else:
+        print("  WARNING: KeyID does NOT match! You may be using a different key.")
 else:
     print("B2_APPLICATION_KEY_ID not found")
 if aws_secret_access_key:
@@ -90,11 +108,19 @@ else:
 print(f"Loaded B2_ENDPOINT_URL: {endpoint_url}")
 print(f"Loaded B2_BUCKET_NAME: {bucket_name}")
 
+# Create S3 client with region and config for proper pre-signed URL generation
+s3_config = Config(
+    signature_version='s3v4',
+    s3={'addressing_style': 'path'}
+)
+
 s3_client = session.client(
     service_name='s3',
     aws_access_key_id=aws_access_key_id,
     aws_secret_access_key=aws_secret_access_key,
-    endpoint_url=endpoint_url
+    endpoint_url=endpoint_url,
+    region_name=region_name,
+    config=s3_config
 )
 
 BUCKET_NAME = bucket_name
@@ -102,11 +128,14 @@ BUCKET_NAME = bucket_name
 
 def generate_presigned_download_url(bucket_name, file_name, expiration=3600):
     try:
+        # For Backblaze B2, we need to use the bucket in the URL path
         url = s3_client.generate_presigned_url(
             'get_object',
             Params={'Bucket': bucket_name, 'Key': file_name},
             ExpiresIn=expiration
         )
+        # Backblaze B2 sometimes needs the bucket name in the path
+        # If the URL doesn't include the bucket, we might need to adjust it
         return url
     except Exception as e:
         raise Exception(f"Error generating download URL: {str(e)}")
@@ -231,17 +260,28 @@ def check_config():
         'endpoint_preview': endpoint_url if endpoint_url else 'Not set',
     }
     
-    # Try to test the connection
+    # Test bucket access
     try:
-        # Simple test: try to list buckets or head bucket
         s3_client.head_bucket(Bucket=bucket_name)
         config_status['connection_test'] = 'Success'
+        config_status['bucket_access'] = 'Authorized'
     except Exception as e:
-        config_status['connection_test'] = f'Failed: {str(e)}'
+        error_msg = str(e)
+        config_status['connection_test'] = f'Failed: {error_msg}'
+        config_status['bucket_access'] = 'Unauthorized'
         config_status['error_details'] = {
             'error_type': type(e).__name__,
-            'error_message': str(e)
+            'error_message': error_msg
         }
+        
+        # Check if it's a permissions error
+        if 'UnauthorizedAccess' in error_msg or 'not authorized' in error_msg.lower():
+            config_status['fix_required'] = 'The Application Key needs permission to access this bucket. See FIX_PERMISSIONS.md for instructions.'
+            config_status['key_verification'] = {
+                'expected_key_id': '0050428f1a906270000000001',
+                'actual_key_id_preview': aws_access_key_id[:10] + '...' + aws_access_key_id[-5:] if aws_access_key_id and len(aws_access_key_id) > 15 else 'N/A',
+                'key_id_matches': aws_access_key_id == '0050428f1a906270000000001' if aws_access_key_id else False
+            }
     
     return jsonify(config_status)
 
