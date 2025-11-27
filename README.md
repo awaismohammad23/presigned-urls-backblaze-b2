@@ -95,6 +95,46 @@ The application will be available at `http://localhost:5001`
   ```
 - The frontend automatically detects the port, so no manual configuration is needed
 
+## Application Interface
+
+The application features a modern, user-friendly web interface with three main tabs for different operations. Here's what the application looks like:
+
+### Download URL Tab
+
+The Download URL tab allows you to generate pre-signed URLs for downloading existing files from your B2 bucket.
+
+![Download URL Interface](images/download.png)
+
+**Features:**
+- Clean form interface with file name input
+- Configurable expiration time (default: 1 hour)
+- Displays generated URL with expiration details
+- One-click link to test the download
+
+### Upload URL Tab
+
+The Upload URL tab lets you generate pre-signed URLs for uploading new files and includes a built-in file upload tester.
+
+![Upload URL Interface](images/upload.png)
+
+**Features:**
+- Generate upload URLs with custom file names
+- Built-in file upload tester
+- Automatic fallback to server proxy if CORS blocks direct upload
+- Real-time upload status and feedback
+
+### List Files Tab
+
+The List Files tab provides a complete file browser for your B2 bucket with quick actions.
+
+![List Files Interface](images/list-files.png)
+
+**Features:**
+- View all files in your bucket with details (name, size, last modified)
+- Quick "Generate Download URL" button for each file
+- Refresh button to reload the file list
+- Empty state message when bucket is empty
+
 ## Usage
 
 ### Using the Web Interface
@@ -359,6 +399,10 @@ Check configuration status and test bucket access (for debugging).
 ├── app.py                 # Flask backend application
 ├── requirements.txt       # Python dependencies
 ├── .env                  # Environment variables (not in git)
+├── images/               # Application screenshots
+│   ├── download.png      # Download URL interface screenshot
+│   ├── upload.png        # Upload URL interface screenshot
+│   └── list-files.png    # List Files interface screenshot
 ├── static/
 │   ├── index.html        # Frontend HTML
 │   ├── styles.css        # Frontend styles
